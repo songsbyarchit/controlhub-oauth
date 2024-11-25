@@ -1,6 +1,7 @@
 import os
 from flask import Flask, redirect, request, jsonify
 import requests
+import logging
 from dotenv import load_dotenv
 from splunk_helpers import send_to_splunk
 
@@ -17,6 +18,10 @@ ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 REFRESH_TOKEN = os.getenv("REFRESH_TOKEN")
 SPLUNK_HEC_URL = os.getenv("SPLUNK_HEC_URL")  # Splunk HEC URL
 SPLUNK_TOKEN = os.getenv("SPLUNK_TOKEN")      # Splunk Token
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Flask app setup
 app = Flask(__name__)
@@ -100,14 +105,14 @@ def refresh_access_token():
         update_env_file("ACCESS_TOKEN", ACCESS_TOKEN)
         update_env_file("REFRESH_TOKEN", REFRESH_TOKEN)
 
-        print("Access token refreshed successfully!")
+        logger.info("Access token refreshed successfully!")
         return {
             "Access Token": ACCESS_TOKEN,
             "Refresh Token": REFRESH_TOKEN,
             "Expires In": token_data.get("expires_in"),
         }
     else:
-        print(f"Error refreshing token: {response.status_code}, {response.text}")
+        logger.error(f"Error refreshing token: {response.status_code}, {response.text}")
         return None
 
 # Route to manually refresh the access token
@@ -124,11 +129,13 @@ def fetch_control_hub_data(endpoint):
     base_url = "https://webexapis.com/v1/"
     url = f"{base_url}{endpoint}"
     headers = {"Authorization": f"Bearer {ACCESS_TOKEN}"}
+    logger.info(f"Requesting data from endpoint: {endpoint}")
     response = requests.get(url, headers=headers)
     if response.status_code == 200:
+        logger.info(f"Data successfully fetched from endpoint: {endpoint}")
         return response.json()
     else:
-        print(f"Error fetching {endpoint}: {response.status_code} - {response.text}")
+        logger.error(f"Error fetching {endpoint}: {response.status_code} - {response.text}")
         return {}
 
 # Example: Fetch Rooms
@@ -145,6 +152,7 @@ def send_rooms_to_splunk():
         send_to_splunk("webex_rooms", rooms, SPLUNK_HEC_URL, SPLUNK_TOKEN)
         return "Rooms data sent to Splunk successfully!"
     else:
+        logger.error("Failed to fetch rooms data from Control Hub.")
         return "Failed to fetch or send rooms data to Splunk."
 
 @app.route("/fetch_visible_rooms")
